@@ -21,6 +21,7 @@ int main() {
 
   VideoCapture cap(0); // capture from default camera
   Mat frame;
+  Point priorCenter(0, 0);
 
   face_cascade.load("haarcascade_frontalface_alt.xml"); // load face classifiers
   eyes_cascade.load("haarcascade_eye_tree_eyeglasses.xml"); // load eye classifiers
@@ -29,9 +30,6 @@ int main() {
 	      CV_WINDOW_AUTOSIZE |
 	      CV_WINDOW_FREERATIO |
 	      CV_GUI_EXPANDED);
-
-  cap.read(frame);
-  Point priorCenter(frame.size().width/3,frame.size().height/4);
   
   // Loop to capture frames
   while(cap.read(frame)) {
@@ -54,8 +52,10 @@ Mat outputFrame(Mat frame, Point center, int w, int h) {
   int y = (center.y - 3*h/5);
 
   if(x + w > frame.size().width - 2 || x < 0 ||
-     y + h > frame.size().height - 2 || y < 0)
-    return frame(Rect(0, 0, 1, 1));
+     y + h > frame.size().height - 2 || y < 0 &&
+     frame.size().width > 16 &&
+     frame.size().height > 16)
+    return frame(Rect(5, 5, 10, 10));
   
   // output frame of only face
   return frame(Rect(x, y, w, h));
@@ -112,13 +112,13 @@ Point detectFace(Mat frame, Point priorCenter) {
   
   std::vector<Rect> faces;
   Mat frame_gray, frame_lab, output, temp;
-  int h = 2 * frame.size().height / 3;
-  int w = 3 * h / 5;
+  int h = frame.size().height - 1;
+  int w = frame.size().width - 1;
   int minNeighbors = 2;
   bool faceNotFound = false;
 
   // Generate output frame based on prior estimates
-  output = outputFrame(frame, priorCenter, w, h);
+  // output = outputFrame(frame, priorCenter, w, h);
 
   cvtColor(frame, frame_gray, COLOR_BGR2GRAY);   // Convert to gray
   equalizeHist(frame_gray, frame_gray);          // Equalize histogram
@@ -139,6 +139,12 @@ Point detectFace(Mat frame, Point priorCenter) {
     h = roundUp(faces[i].height, frame.size().height / 4);
     w = 3 * h / 5;
 
+    // If priorCenter not yet initialized, initialize
+    if(priorCenter.x == 0) {
+      priorCenter = center;
+      temp = outputFrame(frame, center, w, h);
+    }
+    
     // Check to see if it's probably the same user
     if(abs(center.x - priorCenter.x) < frame.size().width / 6 &&
        abs(center.y - priorCenter.y) < frame.size().height / 6) {
@@ -168,21 +174,26 @@ Point detectFace(Mat frame, Point priorCenter) {
 
     // Findface from eyes
     Rect r(priorCenter.x, priorCenter.y, w, h);
-    priorCenter = faceFromEyes(priorCenter, frame_gray(r));
+    if(priorCenter.x + w > frame_gray.size().width - 2 &&
+       priorCenter.y + h > frame_gray.size().height - 2){
+
+      priorCenter = faceFromEyes(priorCenter, frame_gray(r));
     
-    // Generate temporary face location
-    temp = outputFrame(frame, priorCenter, w, h);
-    
+      // Generate temporary face location
+      temp = outputFrame(frame, priorCenter, w, h);
+    }    
   }
   
   // Check to see if new face found
   if(temp.size().width > 2)
-    output = Mat(temp);
+    output = temp;
+  else
+    output = frame;
   
   // Display only face
-  imshow( face_window, output );
+  imshow(face_window, output);
 
-  if(temp.size().width > 2)
+  if(output.size().width > 2)
     // Draw ellipse around face
     ellipse(frame, priorCenter, Size(w/2, h/2),
 	    0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0);
