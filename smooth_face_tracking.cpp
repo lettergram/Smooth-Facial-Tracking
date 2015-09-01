@@ -117,9 +117,6 @@ Point detectFace(Mat frame, Point priorCenter) {
   int minNeighbors = 2;
   bool faceNotFound = false;
 
-  // Generate output frame based on prior estimates
-  // output = outputFrame(frame, priorCenter, w, h);
-
   cvtColor(frame, frame_gray, COLOR_BGR2GRAY);   // Convert to gray
   equalizeHist(frame_gray, frame_gray);          // Equalize histogram
   
@@ -143,6 +140,7 @@ Point detectFace(Mat frame, Point priorCenter) {
     if(priorCenter.x == 0) {
       priorCenter = center;
       temp = outputFrame(frame, center, w, h);
+      break;
     }
     
     // Check to see if it's probably the same user
